@@ -1,4 +1,3 @@
-// Le Jenkinsfile
 pipeline {
     agent any
 
@@ -14,6 +13,8 @@ pipeline {
         stage('Checkout') {
             steps {
                 echo '🔄 Récupération du code source...'
+                sh 'git config --global http.version HTTP/1.1'
+                sh 'git config --global http.postBuffer 524288000'
                 checkout scm
             }
         }
@@ -22,7 +23,6 @@ pipeline {
             steps {
                 echo '🔨 Construction et tests du projet...'
                 sh '''
-                    # Utiliser le wrapper Maven
                     chmod +x ./mvnw
                     ./mvnw clean compile test -Dmaven.test.failure.ignore=true
                 '''
@@ -32,9 +32,7 @@ pipeline {
         stage('Package') {
             steps {
                 echo '📦 Création du package JAR...'
-                sh '''
-                    ./mvnw clean package -DskipTests
-                '''
+                sh './mvnw clean package -DskipTests'
                 archiveArtifacts artifacts: 'target/*.jar', fingerprint: true
             }
         }
@@ -53,7 +51,6 @@ pipeline {
                         dockerImage.push("latest")
                     }
 
-                    // Nettoyage
                     sh "docker rmi ${imageName} ${latestImageName} || true"
                 }
             }
@@ -77,7 +74,7 @@ pipeline {
 
     post {
         always {
-            deleteDir()
+            script { deleteDir() }
         }
         success {
             echo '🎉 Pipeline exécuté avec succès!'
