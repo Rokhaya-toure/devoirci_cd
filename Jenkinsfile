@@ -35,26 +35,26 @@ pipeline {
             }
         }
 
-//         stage('Push to Docker Hub') {
-//             steps {
-//                 withCredentials([usernamePassword(credentialsId: 'dockerhub-credentials',
-//                         usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {
-//                     bat """
-//                     echo %DOCKER_PASS% | docker login -u %DOCKER_USER% --password-stdin
-//                     docker push %DOCKERHUB_REPO%:latest
-//                     docker logout
-//                     """
-//                 }
-//             }
-//         }
+        stage('Push to Docker Hub') {
+            steps {
+                withCredentials([usernamePassword(credentialsId: 'dockerhub-credentials',
+                        usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {
+                    bat """
+                    echo %DOCKER_PASS% | docker login -u %DOCKER_USER% --password-stdin
+                    docker push %DOCKERHUB_REPO%:latest
+                    docker logout
+                    """
+                }
+            }
+        }
 
-//         stage('Deploy to Render') {
-//             steps {
-//                 echo 'Déclenchement du déploiement Render...'
-//                 bat "curl -X POST %RENDER_DEPLOY_HOOK%"
-//             }
-//         }
-//     }
+        stage('Deploy to Render') {
+            steps {
+                echo 'Déclenchement du déploiement Render...'
+                bat "curl -X POST %RENDER_DEPLOY_HOOK%"
+            }
+        }
+    }
 
     post {
         success {
