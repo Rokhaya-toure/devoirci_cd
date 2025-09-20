@@ -13,27 +13,26 @@ pipeline {
         stage('Checkout') {
             steps {
                 echo '🔄 Récupération du code source...'
-                sh 'git config --global http.version HTTP/1.1'
-                sh 'git config --global http.postBuffer 524288000'
-                checkout scm
+                // Vérification que nous sommes bien dans le bon répertoire
+                bat 'dir'
+                bat 'echo Répertoire actuel: %CD%'
             }
         }
 
         stage('Build & Test') {
             steps {
                 echo '🔨 Construction et tests du projet...'
-                sh '''
-                    chmod +x ./mvnw
-                    ./mvnw clean compile test -Dmaven.test.failure.ignore=true
-                '''
+                // Vérification de l'existence du wrapper Maven
+                bat 'if exist mvnw.cmd (echo Maven wrapper trouvé) else (echo Maven wrapper non trouvé && exit 1)'
+                bat 'mvnw.cmd clean compile test -Dmaven.test.failure.ignore=true'
             }
         }
 
         stage('Package') {
             steps {
                 echo '📦 Création du package JAR...'
-                sh './mvnw clean package -DskipTests'
-                archiveArtifacts artifacts: 'target/*.jar', fingerprint: true
+                bat 'mvnw.cmd clean package -DskipTests'
+                archiveArtifacts artifacts: 'target/*.jar', fingerprint: true, allowEmptyArchive: true
             }
         }
 
@@ -44,6 +43,9 @@ pipeline {
                     def imageName = "${DOCKER_HUB_REPO}:${BUILD_NUMBER}"
                     def latestImageName = "${DOCKER_HUB_REPO}:latest"
 
+                    // Vérification de l'existence du Dockerfile
+                    bat 'if exist Dockerfile (echo Dockerfile trouvé) else (echo Dockerfile non trouvé && exit 1)'
+
                     dockerImage = docker.build(imageName)
 
                     docker.withRegistry('https://registry.hub.docker.com', DOCKER_HUB_CREDENTIALS) {
@@ -51,7 +53,12 @@ pipeline {
                         dockerImage.push("latest")
                     }
 
-                    sh "docker rmi ${imageName} ${latestImageName} || true"
+                    // Suppression des images locales (avec gestion d'erreur améliorée)
+                    bat """
+                    docker images
+                    docker rmi ${imageName} || echo "Impossible de supprimer ${imageName}"
+                    docker rmi ${latestImageName} || echo "Impossible de supprimer ${latestImageName}"
+                    """
                 }
             }
         }
@@ -61,11 +68,11 @@ pipeline {
                 echo '🚀 Déploiement sur Render...'
                 script {
                     withCredentials([string(credentialsId: RENDER_DEPLOY_HOOK, variable: 'RENDER_WEBHOOK')]) {
-                        sh '''
-                            curl -X POST "$RENDER_WEBHOOK" \
-                                -H "Content-Type: application/json" \
-                                -d '{"branch": "main"}'
-                        '''
+                        bat """
+                        curl -X POST "%RENDER_WEBHOOK%" ^
+                            -H "Content-Type: application/json" ^
+                            -d "{\\"branch\\": \\"main\\"}"
+                        """
                     }
                 }
             }
@@ -74,7 +81,10 @@ pipeline {
 
     post {
         always {
-            script { deleteDir() }
+            script {
+                echo 'Nettoyage du workspace...'
+                deleteDir()
+            }
         }
         success {
             echo '🎉 Pipeline exécuté avec succès!'
