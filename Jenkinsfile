@@ -13,9 +13,9 @@ pipeline {
 //     }
 
      environment {
-            DOCKER_HUB_REPO = 'rokhayatoure560/devoirCI'
+            DOCKER_HUB_REPO = 'rokhayatoure560/devoirci'
             DOCKER_IMAGE = "demo-springboot"
-            DOCKER_HUB_CREDENTIALS = 'docker-hub-new'
+//             DOCKER_HUB_CREDENTIALS = 'docker-hub-new'
             RENDER_DEPLOY_HOOK = 'render-webhook'
             RENDER_APP_URL = 'render-app-url'
             MAVEN_OPTS = '-Dmaven.repo.local=/tmp/.m2/repository'
@@ -47,7 +47,7 @@ pipeline {
 
         stage('Push to Docker Hub') {
             steps {
-                withCredentials([usernamePassword(credentialsId: 'dockerhub-credentials',
+                withCredentials([usernamePassword(credentialsId: 'docker-hub-new',
                         usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {
                     bat """
                     echo %DOCKER_PASS% | docker login -u %DOCKER_USER% --password-stdin
