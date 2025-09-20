@@ -9,7 +9,7 @@ pipeline {
     environment {
         DOCKER_IMAGE = "demo-springboot"
         DOCKERHUB_REPO = "rokhayatoure/watsaap_back"
-       RENDER_DEPLOY_HOOK = "https://api.render.com/deploy/srv-d37c4cnfte5s73b5gh80?key=VTeRXjQXajM"
+//        RENDER_DEPLOY_HOOK = "https://api.render.com/deploy/srv-d37c4cnfte5s73b5gh80?key=VTeRXjQXajM"
     }
 
     stages {
