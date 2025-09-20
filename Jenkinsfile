@@ -1,63 +1,58 @@
 pipeline {
     agent any
 
-    environment {
-        DOCKER_HUB_REPO = 'rokhayatoure560/devoirCI'
-        DOCKER_HUB_CREDENTIALS = 'docker-hub-new'
-        RENDER_DEPLOY_HOOK = 'render-webhook'
-        RENDER_APP_URL = 'render-app-url'
-        MAVEN_OPTS = '-Dmaven.repo.local=/tmp/.m2/repository'
+    tools {
+        maven 'Maven-3.9.0'
+        jdk 'JDK-17'
     }
+
+//     environment {
+//         DOCKER_IMAGE = "demo-springboot"
+//         DOCKERHUB_REPO = "awamousene/examen-devops"
+//         RENDER_DEPLOY_HOOK = "https://api.render.com/deploy/srv-d379rvvfte5s73b38t8g?key=aIBRWrfqYb4"
+//     }
+
+     environment {
+            DOCKER_HUB_REPO = 'rokhayatoure560/devoirCI'
+            DOCKER_IMAGE = "demo-springboot"
+            DOCKER_HUB_CREDENTIALS = 'docker-hub-new'
+            RENDER_DEPLOY_HOOK = 'render-webhook'
+            RENDER_APP_URL = 'render-app-url'
+            MAVEN_OPTS = '-Dmaven.repo.local=/tmp/.m2/repository'
+//
+        }
 
     stages {
         stage('Checkout') {
             steps {
-                echo '🔄 Récupération du code source...'
-                // Vérification que nous sommes bien dans le bon répertoire
-                bat 'dir'
-                bat 'echo Répertoire actuel: %CD%'
+                checkout scm
             }
         }
 
-        stage('Build & Test') {
+        stage('Build Maven') {
             steps {
-                echo '🔨 Construction et tests du projet...'
-                // Vérification de l'existence du wrapper Maven
-                bat 'if exist mvnw.cmd (echo Maven wrapper trouvé) else (echo Maven wrapper non trouvé && exit 1)'
-                bat 'mvnw.cmd clean compile test -Dmaven.test.failure.ignore=true'
+                bat 'mvn clean package -DskipTests'
             }
         }
 
-        stage('Package') {
+        stage('Docker Build') {
             steps {
-                echo '📦 Création du package JAR...'
-                bat 'mvnw.cmd clean package -DskipTests'
-                archiveArtifacts artifacts: 'target/*.jar', fingerprint: true, allowEmptyArchive: true
+                bat """
+                docker version
+                docker build -t %DOCKER_IMAGE% .
+                docker tag %DOCKER_IMAGE% %DOCKERHUB_REPO%:latest
+                """
             }
         }
 
-        stage('Build & Push Docker Image') {
+        stage('Push to Docker Hub') {
             steps {
-                echo '🐳 Construction et push de l\'image Docker...'
-                script {
-                    def imageName = "${DOCKER_HUB_REPO}:${BUILD_NUMBER}"
-                    def latestImageName = "${DOCKER_HUB_REPO}:latest"
-
-                    // Vérification de l'existence du Dockerfile
-                    bat 'if exist Dockerfile (echo Dockerfile trouvé) else (echo Dockerfile non trouvé && exit 1)'
-
-                    dockerImage = docker.build(imageName)
-
-                    docker.withRegistry('https://registry.hub.docker.com', DOCKER_HUB_CREDENTIALS) {
-                        dockerImage.push("${BUILD_NUMBER}")
-                        dockerImage.push("latest")
-                    }
-
-                    // Suppression des images locales (avec gestion d'erreur améliorée)
+                withCredentials([usernamePassword(credentialsId: 'dockerhub-credentials',
+                        usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {
                     bat """
-                    docker images
-                    docker rmi ${imageName} || echo "Impossible de supprimer ${imageName}"
-                    docker rmi ${latestImageName} || echo "Impossible de supprimer ${latestImageName}"
+                    echo %DOCKER_PASS% | docker login -u %DOCKER_USER% --password-stdin
+                    docker push %DOCKERHUB_REPO%:latest
+                    docker logout
                     """
                 }
             }
@@ -65,32 +60,18 @@ pipeline {
 
         stage('Deploy to Render') {
             steps {
-                echo '🚀 Déploiement sur Render...'
-                script {
-                    withCredentials([string(credentialsId: RENDER_DEPLOY_HOOK, variable: 'RENDER_WEBHOOK')]) {
-                        bat """
-                        curl -X POST "%RENDER_WEBHOOK%" ^
-                            -H "Content-Type: application/json" ^
-                            -d "{\\"branch\\": \\"main\\"}"
-                        """
-                    }
-                }
+                echo 'Déclenchement du déploiement Render...'
+                bat "curl -X POST %RENDER_DEPLOY_HOOK%"
             }
         }
     }
 
     post {
-        always {
-            script {
-                echo 'Nettoyage du workspace...'
-                deleteDir()
-            }
-        }
         success {
-            echo '🎉 Pipeline exécuté avec succès!'
+            echo 'Pipeline terminé avec succès 🎉'
         }
         failure {
-            echo '❌ Pipeline échoué!'
+            echo 'Échec du pipeline ❌'
         }
     }
 }
